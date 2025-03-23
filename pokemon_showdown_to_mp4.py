@@ -1,37 +1,35 @@
 import os
 import time
+import pyppeteer
 import pyautogui
 import moviepy.editor as mpy
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+import asyncio
 
-def capture_replay(html_file_path, output_video_path, duration):
-    # Set up headless Chrome browser
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--window-size=1920,1080")
-    driver = webdriver.Chrome(options=chrome_options)
-
+async def capture_replay(html_file_path, output_video_path, duration):
+    # Set up headless browser using pyppeteer
+    browser = await pyppeteer.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+    page = await browser.newPage()
+    
     # Open the HTML file in the browser
-    driver.get(f"file://{os.path.abspath(html_file_path)}")
-
+    await page.goto(f"file://{os.path.abspath(html_file_path)}")
+    
     # Wait for the replay to load (adjust if needed)
-    time.sleep(5)
-
+    await asyncio.sleep(5)
+    
     # Play the replay
-    play_button = driver.find_element_by_css_selector(".playbutton")
-    play_button.click()
+    play_button = await page.querySelector('.playbutton')
+    await play_button.click()
 
     # Capture the screen for the duration of the replay
     frames = []
     start_time = time.time()
     while time.time() - start_time < duration:
-        frame = pyautogui.screenshot()
-        frames.append(frame)
-        time.sleep(1 / 30)  # Capture at 30 fps
+        screenshot = await page.screenshot()
+        frames.append(screenshot)
+        await asyncio.sleep(1 / 30)  # Capture at 30 fps
 
     # Close the browser
-    driver.quit()
+    await browser.close()
 
     # Convert frames to video
     video_clips = [mpy.ImageClip(frame).set_duration(1 / 30) for frame in frames]
@@ -48,4 +46,4 @@ if __name__ == "__main__":
     # Duration of the replay in seconds (adjust as needed)
     duration = 120  # 2 minutes
 
-    capture_replay(html_file_path, output_video_path, duration)
+    asyncio.get_event_loop().run_until_complete(capture_replay(html_file_path, output_video_path, duration))
